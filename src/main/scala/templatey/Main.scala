@@ -14,9 +14,13 @@ object Main {
 
   sealed trait Ele
 
+
+
   sealed trait Vertex extends Ele { val name: String }
   case class VertexRef(name: String) extends Vertex
-  case class FullVertex(name: String, labels: TreeSet[String], attributes: Map[String, Primitive]) extends Vertex
+  case class FullVertex(name: String, labels: TreeSet[String], attributes: Map[String, Primitive]) extends Vertex {
+    def asRef: VertexRef = VertexRef(name)
+  }
 
   case class Path(firstVertex: Vertex, edgesAndVertices: List[(String, Vertex)])
 
@@ -24,9 +28,10 @@ object Main {
 
 
   sealed trait WithPart
-  case class WithVertex(vertex: Vertex, as: Option[String]) extends WithPart
+  case class WithVertex(vertex: Vertex, as: Option[String] = None) extends WithPart
   case class WithMap(vertices: Map[String, Vertex]) extends WithPart
-  case class WithCollect(toCollect: WithPart, as: Option[String]) extends WithPart
+  case class WithCollect(toCollect: WithPart, as: String) extends WithPart
+  case class WithName(name: String) extends WithPart
 
   object Implicits {
 
@@ -67,47 +72,47 @@ object Main {
 
 
   def test2(): Unit = {
-    val workflowDefinitionFull =
+    val workflowDefinition =
       FullVertex("workflowDefinition", TreeSet("WORKFLOW_DEFINITION"), Map("uid" -> Primitive("$definitionUid")))
 
-    val workflowInstanceFull =
+    val workflowInstance =
       FullVertex("workflowInstance", TreeSet("WORKFLOW_INSTANCE"), Map("uid" -> Primitive("$instanceUid")))
 
-    val workflowDefinitionRef = fullToReferenceVertex(workflowDefinitionFull)
-    val workflowInstanceRef = fullToReferenceVertex(workflowInstanceFull)
+//    val workflowDefinitionRef = fullToReferenceVertex(workflowDefinitionFull)
+//    val workflowInstanceRef = fullToReferenceVertex(workflowInstanceFull)
 
 
-    val inArtiFull =
+    val inArti =
       FullVertex("inArt", TreeSet("ARTIFACT"), Map("uid" -> Primitive("inputArtifact.uid")))
 
-    renderMatch(workflowDefinitionFull)
-    renderWith(workflowDefinitionFull)
-    renderCreate(Path(workflowInstanceFull, List(("DEFINED_BY", workflowDefinitionRef))))
-    renderWith(List(workflowDefinitionFull, workflowInstanceFull))
-    renderUnwind(Primitive("$inputs"), "inputArtifact")
-    renderMatch(inArtiFull)
-    renderWith(List(workflowDefinitionFull, workflowInstanceFull, inArtiFull))
-    renderCreate(Path(workflowInstanceRef, List(("HAS_INPUT", workflowDefinitionRef))))
+    val outArti =
+      FullVertex("outArt", TreeSet("ARTIFACT"), Map("uid" -> Primitive("outputArtifact.uid")))
 
+    val script =
+      List(
+        renderMatch(workflowDefinition),
+        renderWith(workflowDefinition),
+        renderCreate(Path(workflowInstance, List(("DEFINED_BY", workflowDefinition.asRef)))),
+        renderWith(List(workflowDefinition, workflowInstance)),
 
+        renderUnwind(Primitive("$inputs"), "inputArtifact"),
+        renderMatch(inArti),
+        renderWith(List(workflowDefinition, workflowInstance, inArti)),
+        renderCreate(Path(workflowInstance.asRef, List(("HAS_INPUT", workflowDefinition.asRef)))),
+        renderWith(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithCollect(inArti, "inputs"))),
 
-    val p1 = Path(
-      v1,
-      List(("EDGE_TO_B", v2))
-    )
+        renderUnwind(Primitive("$outputs"), "outputArtifact"),
+        renderCreate(Path(workflowInstance.asRef, List(("PRODUCES_OUTPUT", workflowDefinition.asRef)))),
+        renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithCollect(inArti, "inputs"))),
 
-    val p2 = Path(
-      v1,
-      List(("EDGE_TO_C", v3))
-    )
+        //renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithName("outputs")))
+      ).mkString("\n")
 
-    println(renderCreate(List(p1, p2)))
-    println(renderWith(List(v1, v2, v3)))
-    println(renderReturn(List(v1, v2, v3)))
+    println(script)
   }
 
   def main(args: Array[String]): Unit = {
-
+    test2()
   }
 
   def test1(): Unit = {
@@ -193,8 +198,9 @@ object Main {
   def renderWithPart(part: WithPart): String = part match {
     case WithVertex(vertex, as) => as.map(as => s"${vertex.name} AS $as").getOrElse(vertex.name)
 
-    case WithCollect(toCollect, as) =>
-      as.map(as => s"COLLECT(${renderWithPart(toCollect)}) AS $as").getOrElse(s"COLLECT(${renderWithPart(toCollect)})")
+    case WithCollect(toCollect, as) => s"COLLECT(${renderWithPart(toCollect)}) AS $as"
+
+    case WithName(name) => name
 
     case WithMap(vertices: Map[String, Vertex]) => {
       val renderedMap = vertices.map { case (key, vertex) => s"$key: ${vertex.name}" }
@@ -204,7 +210,7 @@ object Main {
   }
 
   def renderUnwind(primitive: Primitive, as: String): String =
-    s"UNWIND ($primitive) AS $as"
+    s"UNWIND (${primitive.key}) AS $as"
 
   def indent(str: String, by: Int = 3): String = {
     str.split("\n").map(line => s"${" " * by}$line").mkString("\n")
