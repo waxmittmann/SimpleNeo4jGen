@@ -1,8 +1,11 @@
 package templatey
 
 import java.util
+import templatey.utils
 import java.util.UUID
 import scala.collection.immutable.TreeSet
+
+import templatey.utils.Neo4s
 
 object Main {
 
@@ -103,16 +106,56 @@ object Main {
     case AttributeList(l) => renderListParam(l)
   }
 
-  def test2(): Unit = {
+
+  def test3(): Either[String, (UUID, UUID)] = {
+    val arti =
+      FullVertex("artifact", TreeSet("ARTIFACT"), Map("uid" -> VariablePath("artifactData.uid")))
+
+    val script =
+      List(
+        renderUnwind(VariablePath("$artifacts"), "artifactData"),
+        renderCreate(arti),
+        renderReturn(List(WithCollect(arti, "artifacts")))
+      ).mkString("\n")
+
+    val params =
+      AttributeMap(Map(
+        "artifacts" -> AttributeList(List(
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID())))
+        ))
+      ))
+
+    println(script + "\n\n" + renderParams(params))
+
+    val result = graph.write(script, renderMapParam(params)).left.map(println).right.get
+    if (result.hasNext()) {
+//      println(result.next().asMap())
+
+      val result2 =
+        for {
+          r <- Neo4s.parse(result.next()).flatMap(m => Neo4s.asList(m, "artifacts"))
+
+          artifacts <- Neo4s.asList(r)
+
+          artifact1 <- Neo4s.asNode(artifacts.vals(0))
+          arti1Uid <- Neo4s.asUUID(artifact1, "uid")
+          artifact2 <- Neo4s.asNode(artifacts.vals(1))
+          arti2Uid <- Neo4s.asUUID(artifact2, "uid")
+        } yield (arti1Uid, arti2Uid)
+
+      result2
+    } else
+      Left("Failed: Produced no result")
+  }
+
+
+  def test2(uidA: UUID, uidB: UUID): Unit = {
     val workflowDefinition =
       FullVertex("workflowDefinition", TreeSet("WORKFLOW_DEFINITION"), Map("uid" -> VariablePath("$definitionUid")))
 
     val workflowInstance =
       FullVertex("workflowInstance", TreeSet("WORKFLOW_INSTANCE"), Map("uid" -> VariablePath("$instanceUid")))
-
-//    val workflowDefinitionRef = fullToReferenceVertex(workflowDefinitionFull)
-//    val workflowInstanceRef = fullToReferenceVertex(workflowInstanceFull)
-
 
     val inArti =
       FullVertex("inArt", TreeSet("ARTIFACT"), Map("uid" -> VariablePath("inputArtifact.uid")))
@@ -145,8 +188,8 @@ object Main {
         "definitionUid" -> AttributeUid(UUID.randomUUID()),
         "instanceUid" -> AttributeUid(UUID.randomUUID()),
         "inputs" -> AttributeList(List(
-          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
-          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID())))
+          AttributeMap(Map("uid" -> AttributeUid(uidA))),
+          AttributeMap(Map("uid" -> AttributeUid(uidB)))
         )),
         "outputs" -> AttributeList(List(
           AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
@@ -162,28 +205,17 @@ object Main {
     else
       println("Failed: Produced no result")
 
-//    val session = graph.driver.session()
-//    try {
-//      session.writeTransaction {
-//        tx =>
-//          val result = tx.run(script, renderMapParam(params))
-//          tx.success()
-//
-//          if (result.hasNext())
-//            println(result.next().asMap())
-//          else
-//            println("Failed: Produced no result")
-//      }
-//    } catch {
-//      case e => println(e)
-//    } finally {
-//      session.close()
-//    }
     graph.close()
   }
 
   def main(args: Array[String]): Unit = {
-    test2()
+//    test2()
+
+    val (uid1, uid2) = test3().left.map(println).right.get
+    println(uid1 + ", " + uid2)
+    test2(uid1, uid2)//.left.map(println).right.get
+
+    graph.close()
   }
 
   def test1(): Unit = {
