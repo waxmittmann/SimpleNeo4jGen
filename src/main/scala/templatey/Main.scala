@@ -1,5 +1,7 @@
 package templatey
 
+import java.util
+import java.util.UUID
 import scala.collection.immutable.TreeSet
 
 object Main {
@@ -10,15 +12,22 @@ object Main {
 //  case class PBoolean(b: Boolean) extends Primitive
 //  case class PString(s: String) extends Primitive
 
-  case class Primitive(key: String)
-
-  sealed trait Ele
 
 
 
-  sealed trait Vertex extends Ele { val name: String }
+  sealed trait Attribute
+  case class AttributeInt(i: Int) extends Attribute
+  case class AttributeString(s: String) extends Attribute
+  case class AttributeUid(uid: UUID) extends Attribute
+  case class AttributeMap(m: Map[String, Attribute]) extends Attribute
+  case class AttributeList(l: List[Attribute]) extends Attribute
+
+
+  case class VariablePath(key: String)
+
+  sealed trait Vertex { val name: String }
   case class VertexRef(name: String) extends Vertex
-  case class FullVertex(name: String, labels: TreeSet[String], attributes: Map[String, Primitive]) extends Vertex {
+  case class FullVertex(name: String, labels: TreeSet[String], attributes: Map[String, VariablePath]) extends Vertex {
     def asRef: VertexRef = VertexRef(name)
   }
 
@@ -71,22 +80,43 @@ object Main {
    */
 
 
+//  def renderParams(params: AttributeMap): util.HashMap[String, Object] = {
+//    params.m.mapValues()
+//  }
+
+  import scala.collection.JavaConverters._
+
+  def renderMapParam(m: Map[String, Attribute]): util.Map[String, Object] =
+    m.mapValues(renderParams).asJava
+
+  def renderListParam(l: List[Attribute]): util.List[Object] =
+    l.map(renderParams).asJava
+
+
+  def renderParams(attr: Attribute): Object = attr match {
+    case AttributeInt(i) => i.asInstanceOf[Object]
+    case AttributeString(s) => s.asInstanceOf[Object]
+    case AttributeUid(uid) => uid.toString.asInstanceOf[Object]
+    case AttributeMap(m) => renderMapParam(m)
+    case AttributeList(l) => renderListParam(l)
+  }
+
   def test2(): Unit = {
     val workflowDefinition =
-      FullVertex("workflowDefinition", TreeSet("WORKFLOW_DEFINITION"), Map("uid" -> Primitive("$definitionUid")))
+      FullVertex("workflowDefinition", TreeSet("WORKFLOW_DEFINITION"), Map("uid" -> VariablePath("$definitionUid")))
 
     val workflowInstance =
-      FullVertex("workflowInstance", TreeSet("WORKFLOW_INSTANCE"), Map("uid" -> Primitive("$instanceUid")))
+      FullVertex("workflowInstance", TreeSet("WORKFLOW_INSTANCE"), Map("uid" -> VariablePath("$instanceUid")))
 
 //    val workflowDefinitionRef = fullToReferenceVertex(workflowDefinitionFull)
 //    val workflowInstanceRef = fullToReferenceVertex(workflowInstanceFull)
 
 
     val inArti =
-      FullVertex("inArt", TreeSet("ARTIFACT"), Map("uid" -> Primitive("inputArtifact.uid")))
+      FullVertex("inArt", TreeSet("ARTIFACT"), Map("uid" -> VariablePath("inputArtifact.uid")))
 
     val outArti =
-      FullVertex("outArt", TreeSet("ARTIFACT"), Map("uid" -> Primitive("outputArtifact.uid")))
+      FullVertex("outArt", TreeSet("ARTIFACT"), Map("uid" -> VariablePath("outputArtifact.uid")))
 
     val script =
       List(
@@ -95,20 +125,34 @@ object Main {
         renderCreate(Path(workflowInstance, List(("DEFINED_BY", workflowDefinition.asRef)))),
         renderWith(List(workflowDefinition, workflowInstance)),
 
-        renderUnwind(Primitive("$inputs"), "inputArtifact"),
+        renderUnwind(VariablePath("$inputs"), "inputArtifact"),
         renderMatch(inArti),
         renderWith(List(workflowDefinition, workflowInstance, inArti)),
-        renderCreate(Path(workflowInstance.asRef, List(("HAS_INPUT", workflowDefinition.asRef)))),
+        renderCreate(Path(workflowInstance.asRef, List(("HAS_INPUT", inArti.asRef)))),
         renderWith(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithCollect(inArti, "inputs"))),
 
-        renderUnwind(Primitive("$outputs"), "outputArtifact"),
-        renderCreate(Path(workflowInstance.asRef, List(("PRODUCES_OUTPUT", workflowDefinition.asRef)))),
+        renderUnwind(VariablePath("$outputs"), "outputArtifact"),
+        renderCreate(Path(workflowInstance.asRef, List(("PRODUCES_OUTPUT", outArti)))),
         renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithCollect(inArti, "inputs"))),
 
         //renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithName("outputs")))
       ).mkString("\n")
 
-    println(script)
+    val params =
+      AttributeMap(Map(
+        "workflowDefinitionUid" -> AttributeUid(UUID.randomUUID()),
+        "workflowInstanceUid" -> AttributeUid(UUID.randomUUID()),
+        "inputs" -> AttributeList(List(
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID())))
+        )),
+        "outputs" -> AttributeList(List(
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
+          AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID())))
+        ))
+      ))
+
+    println(script + "\n\n" + renderParams(params))
   }
 
   def main(args: Array[String]): Unit = {
@@ -117,8 +161,8 @@ object Main {
 
   def test1(): Unit = {
     val v1 = VertexRef("a")
-    val v2 = FullVertex("b", TreeSet("B", "B2"), Map("bInt" -> Primitive("data.bInt")))
-    val v3 = FullVertex("c", TreeSet("C", "C2"), Map("cBool" -> Primitive("data.cBool")))
+    val v2 = FullVertex("b", TreeSet("B", "B2"), Map("bInt" -> VariablePath("data.bInt")))
+    val v3 = FullVertex("c", TreeSet("C", "C2"), Map("cBool" -> VariablePath("data.cBool")))
 
     val p1 = Path(
       v1,
@@ -141,7 +185,7 @@ object Main {
   def renderLabels(labels: Set[String]): String = labels.map(l => s":$l").mkString(" ")
 
 
-  def renderAttribute(primitive: Primitive): String = primitive.key
+  def renderAttribute(primitive: VariablePath): String = primitive.key
 //  {
 //    primitive match {
 //      case PInt(i)      => i.toString
@@ -150,7 +194,7 @@ object Main {
 //    }
 //  }
 
-  def renderAttributes(attributes: Map[String, Primitive]): String = {
+  def renderAttributes(attributes: Map[String, VariablePath]): String = {
     val attrString = attributes.map { case (k, v) => s"$k: ${renderAttribute(v)}" }.mkString(", ")
     s"{ $attrString }"
   }
@@ -209,7 +253,7 @@ object Main {
 
   }
 
-  def renderUnwind(primitive: Primitive, as: String): String =
+  def renderUnwind(primitive: VariablePath, as: String): String =
     s"UNWIND (${primitive.key}) AS $as"
 
   def indent(str: String, by: Int = 3): String = {
