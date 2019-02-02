@@ -7,6 +7,9 @@ import scala.collection.immutable.TreeSet
 object Main {
 
 
+
+  val graph = new WrappedDriver("bolt://127.0.0.1:7687", "neo4j", "test")
+
 //  sealed trait Primitive
 //  case class PInt(i: Int) extends Primitive
 //  case class PBoolean(b: Boolean) extends Primitive
@@ -86,18 +89,17 @@ object Main {
 
   import scala.collection.JavaConverters._
 
-  def renderMapParam(m: Map[String, Attribute]): util.Map[String, Object] =
-    m.mapValues(renderParams).asJava
+  def renderMapParam(m: AttributeMap): util.Map[String, Object] =
+    m.m.mapValues(renderParams).asJava
 
   def renderListParam(l: List[Attribute]): util.List[Object] =
     l.map(renderParams).asJava
-
 
   def renderParams(attr: Attribute): Object = attr match {
     case AttributeInt(i) => i.asInstanceOf[Object]
     case AttributeString(s) => s.asInstanceOf[Object]
     case AttributeUid(uid) => uid.toString.asInstanceOf[Object]
-    case AttributeMap(m) => renderMapParam(m)
+    case am: AttributeMap => renderMapParam(am)
     case AttributeList(l) => renderListParam(l)
   }
 
@@ -133,15 +135,15 @@ object Main {
 
         renderUnwind(VariablePath("$outputs"), "outputArtifact"),
         renderCreate(Path(workflowInstance.asRef, List(("PRODUCES_OUTPUT", outArti)))),
-        renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithCollect(inArti, "inputs"))),
+        renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithCollect(outArti, "outputs")))
 
         //renderReturn(List(WithVertex(workflowDefinition), WithVertex(workflowInstance), WithName("inputs"), WithName("outputs")))
       ).mkString("\n")
 
     val params =
       AttributeMap(Map(
-        "workflowDefinitionUid" -> AttributeUid(UUID.randomUUID()),
-        "workflowInstanceUid" -> AttributeUid(UUID.randomUUID()),
+        "definitionUid" -> AttributeUid(UUID.randomUUID()),
+        "instanceUid" -> AttributeUid(UUID.randomUUID()),
         "inputs" -> AttributeList(List(
           AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID()))),
           AttributeMap(Map("uid" -> AttributeUid(UUID.randomUUID())))
@@ -153,6 +155,31 @@ object Main {
       ))
 
     println(script + "\n\n" + renderParams(params))
+
+    val result = graph.write(script, renderMapParam(params)).right.get
+    if (result.hasNext())
+      println(result.next().asMap())
+    else
+      println("Failed: Produced no result")
+
+//    val session = graph.driver.session()
+//    try {
+//      session.writeTransaction {
+//        tx =>
+//          val result = tx.run(script, renderMapParam(params))
+//          tx.success()
+//
+//          if (result.hasNext())
+//            println(result.next().asMap())
+//          else
+//            println("Failed: Produced no result")
+//      }
+//    } catch {
+//      case e => println(e)
+//    } finally {
+//      session.close()
+//    }
+    graph.close()
   }
 
   def main(args: Array[String]): Unit = {
@@ -223,7 +250,7 @@ object Main {
 
   def renderPath(path: Path): String =
     path.edgesAndVertices.foldLeft(List(renderVertex(path.firstVertex))) { case (statement, (edgeLabel, vertex)) =>
-      s"-[$edgeLabel]-> ${renderVertex(vertex)}" :: statement
+      s"-[:$edgeLabel]-> ${renderVertex(vertex)}" :: statement
     }.reverse.mkString
 
 

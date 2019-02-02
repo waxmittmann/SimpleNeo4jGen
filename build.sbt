@@ -73,11 +73,11 @@ libraryDependencies ++= Seq(
 //  "org.tpolecat" %% "doobie-specs2-cats" % doobieVersion, // scalaz
 
   // Neo4j
-//  "org.neo4j" % "neo4j" % neo4jBase,
-//  "org.neo4j" % "neo4j-common" % neo4jBase,
-//  "org.neo4j" % "neo4j-cypher" % neo4jBase,
-//  "org.neo4j" % "neo4j-bolt" % neo4jBase,
-//  "org.neo4j.driver" % "neo4j-java-driver" % neo4jDriver,
+  "org.neo4j" % "neo4j" % neo4jBase,
+  "org.neo4j" % "neo4j-common" % neo4jBase,
+  "org.neo4j" % "neo4j-cypher" % neo4jBase,
+  "org.neo4j" % "neo4j-bolt" % neo4jBase,
+  "org.neo4j.driver" % "neo4j-java-driver" % neo4jDriver,
 
 
   // PureConfig
