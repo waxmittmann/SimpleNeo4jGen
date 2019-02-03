@@ -1,9 +1,9 @@
-package templatey
+package simpleneojgen.utils
 
 import java.util
 
 import org.neo4j.driver.v1._
-import templatey.Main.graph
+import simpleneojgen.Main.graph
 
 class WrappedDriver(url: String, user: String, password: String) {
 

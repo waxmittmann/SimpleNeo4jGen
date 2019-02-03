@@ -1,4 +1,4 @@
-package templatey.utils
+package simpleneojgen.utils
 
 import java.time.{Instant, ZonedDateTime}
 import java.util.UUID
