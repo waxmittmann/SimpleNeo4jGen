@@ -1,10 +1,6 @@
-package simpleneojgen
+package simpleneojgen.v1
 
-import java.util
-import java.util.UUID
 import scala.collection.immutable.TreeSet
-
-import scala.collection.JavaConverters._
 
 object StatementGeneration {
 
@@ -33,8 +29,6 @@ object StatementGeneration {
     implicit def toPath(vertex: Vertex): Path = Path(vertex, List.empty)
 
   }
-
-  import Implicits._
 
   def fullToReferenceVertex(full: FullVertex): VertexRef = VertexRef(full.name)
 

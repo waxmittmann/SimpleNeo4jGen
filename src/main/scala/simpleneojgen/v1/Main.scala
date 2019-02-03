@@ -1,13 +1,12 @@
-package simpleneojgen
+package simpleneojgen.v1
 
 import java.util.UUID
 import scala.collection.immutable.TreeSet
 
 import simpleneojgen.utils.{Neo4s, WrappedDriver}
-import simpleneojgen.ParametersGeneration._
-import simpleneojgen.StatementGeneration._
-
-import simpleneojgen.StatementGeneration.Implicits._
+import simpleneojgen.v1.ParametersGeneration._
+import simpleneojgen.v1.StatementGeneration.Implicits._
+import simpleneojgen.v1.StatementGeneration._
 
 object Main {
 

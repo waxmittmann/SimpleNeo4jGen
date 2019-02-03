@@ -1,4 +1,4 @@
-package simpleneojgen
+package simpleneojgen.v2
 
 import java.util
 import java.util.UUID

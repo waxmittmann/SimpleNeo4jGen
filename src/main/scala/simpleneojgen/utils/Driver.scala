@@ -3,7 +3,7 @@ package simpleneojgen.utils
 import java.util
 
 import org.neo4j.driver.v1._
-import simpleneojgen.Main.graph
+import simpleneojgen.v1.Main.graph
 
 class WrappedDriver(url: String, user: String, password: String) {
 
