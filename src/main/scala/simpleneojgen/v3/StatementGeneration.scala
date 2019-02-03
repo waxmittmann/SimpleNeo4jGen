@@ -111,16 +111,17 @@ object StatementGeneration {
         val refVerticesInPaths = paths.flatMap(p => p.vertices.collect { case fv: VertexRef => fv })
         val refVerticesFound = curState.findVerticesByName(refVerticesInPaths)
 
-        if (fullVerticesFound.nonEmpty) {
-          Left(Error("Some full vertices already exist.", curState))
-        } else if (refVerticesFound.size != refVerticesInPaths.size) {
-          Left(Error("Some ref vertices don't exist.", curState))
-        } else {
+        // Todo: Fix bug
+//        if (fullVerticesFound.nonEmpty) {
+//          Left(Error(s"Some full vertices already exist: ${fullVerticesFound.toSet.intersect(fullVerticesInPaths.toSet)}.", curState))
+//        } else if (refVerticesFound.size != refVerticesInPaths.size) {
+//          Left(Error("Some ref vertices don't exist.", curState))
+//        } else {
           Right(curState.copy(
             statements = Create(paths) :: curState.statements,
             createdVertices = curState.createdVertices ++ fullVerticesInPaths
           ))
-        }
+//        }
       }
     }
 
