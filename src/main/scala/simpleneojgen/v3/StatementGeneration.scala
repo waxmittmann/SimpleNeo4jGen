@@ -47,6 +47,20 @@ object StatementGeneration {
   type Result[S] = StateT[E, GenData, S]
 
   object Dsl {
+    def matchs(paths: List[Path]): Result[Unit] = StateT.modifyF[E, GenData] { curState =>
+
+      // Todo: Check that we've previously matched any Refs and haven't matched any Fulls
+
+      Right(curState.copy(statements = Match(paths) :: curState.statements))
+    }
+
+    def unwind(path: VariablePath, str: String): Result[Unit] = {
+      StateT.modifyF[E, GenData] { curState =>
+        // Todo: Keep track of names we've just unwound + make sure we're not conflicting
+        Right(curState.copy(statements = Unwind(path, str) :: curState.statements))
+      }
+    }
+
     //def returns(vertexes: List[FullVertex]): EitherT[GenState, String, GenState] = ???
 
 //    def returns(vertexes: List[FullVertex]): State[GenState, String, GenState] = ???

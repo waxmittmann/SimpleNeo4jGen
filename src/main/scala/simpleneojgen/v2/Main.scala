@@ -90,7 +90,6 @@ object Main {
       Left("Failed: Produced no result")
   }
 
-
   def createInstance(defnUid: UUID, uidA: UUID, uidB: UUID): Unit = {
     val workflowDefinition =
       FullVertex("workflowDefinition", TreeSet("WORKFLOW_DEFINITION"), Map("uid" -> VariablePath("$definitionUid")))
